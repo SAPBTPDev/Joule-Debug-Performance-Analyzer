@@ -3,88 +3,146 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Joule Debug Performance Analyzer</title>
+<meta name="author" content="Kartik Metkar">
+<title>Joule Performance Analyzer</title>
+<link rel="icon" type="image/svg+xml" href="https://me.sap.com/resources/sap/me/workspace/widgets/aiAssistant/img/jouleIcon.svg">
 <style>
+/* SAP "72" typeface (falls back to system UI fonts when offline) */
+@font-face{font-family:"72";font-weight:400;font-display:swap;src:url("https://ui5.sap.com/resources/sap/ui/core/themes/sap_horizon/fonts/72-Regular.woff2") format("woff2")}
+@font-face{font-family:"72";font-weight:700;font-display:swap;src:url("https://ui5.sap.com/resources/sap/ui/core/themes/sap_horizon/fonts/72-Bold.woff2") format("woff2")}
+
+/* ---- Theme: SAP Fiori Horizon (light) + validated chart palette ---- */
 .viz-root{
   color-scheme:light;
-  --surface-0:#f4f3f0; --surface-1:#fcfcfb; --surface-2:#f0efec;
-  --border:#e2e1dc; --grid:#ebeae6;
-  --text-primary:#0b0b0b; --text-secondary:#52514e; --text-muted:#7a7974;
-  --accent:#2a78d6;
+  --shell:#ffffff; --shell-border:#d9d9d9;
+  --surface-0:#f5f6f7; --surface-1:#ffffff; --surface-2:#eaecee;
+  --border:#d9d9d9; --grid:#e5e5e5;
+  --text-primary:#1d2d3e; --text-secondary:#556b82; --text-muted:#758ca4;
+  --accent:#0070f2; --accent-hover:#0064d9; --accent-soft:#ebf8ff;
+  --joule-1:#3d1fd6; --joule-2:#7b37e8; --joule-3:#c045d6;
+  --hero-text:#ffffff;
+  --shadow:0 0 0.125rem rgba(34,53,72,.15),0 0.125rem 0.5rem rgba(34,53,72,.15);
   --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100; --s5:#e87ba4;
-  --critical:#d03b3b; --good:#0ca30c; --warning:#fab219;
-  --crit-bg:#fbeaea; --warn-bg:#fff6e0; --good-bg:#e9f6e9;
+  --critical:#aa0808; --good:#256f3a; --warning:#e76500;
+  --crit-bg:#ffeaf4; --warn-bg:#fff8d6; --good-bg:#f5fae5;
 }
 @media (prefers-color-scheme: dark){
   :root:where(:not([data-theme="light"])) .viz-root{
     color-scheme:dark;
-    --surface-0:#121211; --surface-1:#1a1a19; --surface-2:#262624;
-    --border:#33332f; --grid:#2a2a27;
-    --text-primary:#f0efec; --text-secondary:#c3c2b7; --text-muted:#8f8e86;
-    --accent:#3987e5;
+    --shell:#12171c; --shell-border:#2e3742;
+    --surface-0:#12171c; --surface-1:#1d232a; --surface-2:#29313a;
+    --border:#2e3742; --grid:#29313a;
+    --text-primary:#eaecee; --text-secondary:#a9b4be; --text-muted:#8396a8;
+    --accent:#4db1ff; --accent-hover:#7cc6ff; --accent-soft:#16283a;
+    --shadow:0 0 0.125rem rgba(0,0,0,.4),0 0.125rem 0.5rem rgba(0,0,0,.4);
     --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181;
-    --crit-bg:#3a1c1c; --warn-bg:#3a3018; --good-bg:#16301a;
+    --critical:#ff8888; --good:#97dd40; --warning:#ffdf72;
+    --crit-bg:#3a1c22; --warn-bg:#3a3018; --good-bg:#1f3318;
   }
 }
 :root[data-theme="dark"] .viz-root{
   color-scheme:dark;
-  --surface-0:#121211; --surface-1:#1a1a19; --surface-2:#262624;
-  --border:#33332f; --grid:#2a2a27;
-  --text-primary:#f0efec; --text-secondary:#c3c2b7; --text-muted:#8f8e86;
-  --accent:#3987e5;
+  --shell:#12171c; --shell-border:#2e3742;
+  --surface-0:#12171c; --surface-1:#1d232a; --surface-2:#29313a;
+  --border:#2e3742; --grid:#29313a;
+  --text-primary:#eaecee; --text-secondary:#a9b4be; --text-muted:#8396a8;
+  --accent:#4db1ff; --accent-hover:#7cc6ff; --accent-soft:#16283a;
+  --shadow:0 0 0.125rem rgba(0,0,0,.4),0 0.125rem 0.5rem rgba(0,0,0,.4);
   --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181;
-  --crit-bg:#3a1c1c; --warn-bg:#3a3018; --good-bg:#16301a;
+  --critical:#ff8888; --good:#97dd40; --warning:#ffdf72;
+  --crit-bg:#3a1c22; --warn-bg:#3a3018; --good-bg:#1f3318;
 }
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
-body.viz-root{background:var(--surface-0);color:var(--text-primary);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-.wrap{max-width:1280px;margin:0 auto;padding:24px 20px 60px}
-h1{font-size:22px;margin:0 0 4px}
-h2{font-size:16px;margin:28px 0 10px}
-.sub{color:var(--text-secondary);margin:0 0 18px}
-.card{background:var(--surface-1);border:1px solid var(--border);border-radius:10px;padding:16px}
-.drop{display:block;border:2px dashed var(--border);border-radius:10px;padding:26px;text-align:center;background:var(--surface-1);cursor:pointer;transition:border-color .15s}
-.drop.over{border-color:var(--accent)}
-.drop strong{display:block;font-size:15px;margin-bottom:4px}
+body.viz-root{background:var(--surface-0);color:var(--text-primary);font:14px/1.45 "72","72full",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+
+/* Shell bar */
+.shell{position:sticky;top:0;z-index:40;background:var(--shell);border-bottom:1px solid var(--shell-border);box-shadow:var(--shadow)}
+.shell-in{max-width:1320px;margin:0 auto;height:52px;padding:0 20px;display:flex;align-items:center;gap:12px}
+.shell img.logo{width:30px;height:30px}
+.shell .prod{font-weight:700;font-size:16px;white-space:nowrap}
+.shell .sep{width:1px;height:20px;background:var(--border)}
+.shell .ctx{color:var(--text-secondary);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.shell .sp{flex:1}
+.sig{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--text-secondary);white-space:nowrap}
+.sig .av{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--joule-1),var(--joule-3));color:#fff;display:grid;place-items:center;font-weight:700;font-size:12px;letter-spacing:.5px}
+.sig b{color:var(--text-primary);font-weight:700}
+.sig a{display:inline-flex;align-items:center;gap:4px;font-weight:700}
+.themebtn{font:inherit;border:1px solid var(--border);background:transparent;color:var(--text-secondary);border-radius:8px;width:32px;height:32px;cursor:pointer;display:grid;place-items:center}
+.themebtn:hover{border-color:var(--accent);color:var(--accent)}
+
+/* Hero */
+.hero{background:linear-gradient(120deg,var(--joule-1) 0%,var(--joule-2) 55%,var(--joule-3) 100%);color:var(--hero-text);position:relative;overflow:hidden}
+.hero-in{max-width:1320px;margin:0 auto;padding:30px 20px 78px;display:grid;grid-template-columns:1.35fr 1fr;gap:24px;align-items:center;position:relative;z-index:1}
+.hero .eyebrow{display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.25);border-radius:999px;padding:3px 12px 3px 4px;font-size:12px;font-weight:700;letter-spacing:.2px}
+.hero .eyebrow img{width:20px;height:20px;background:#fff;border-radius:50%;padding:2px}
+.hero h1{font-size:30px;line-height:1.15;margin:12px 0 8px;font-weight:700}
+.hero p{margin:0;max-width:620px;opacity:.92;font-size:14.5px}
+.hero .pills{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.hero .pills span{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.22);border-radius:6px;padding:3px 10px;font-size:12px}
+.hero svg.art{width:100%;max-width:440px;justify-self:end;filter:drop-shadow(0 12px 28px rgba(20,0,60,.35))}
+.hero .glow{position:absolute;border-radius:50%;filter:blur(60px);opacity:.45;z-index:0}
+@media (max-width:860px){ .hero-in{grid-template-columns:1fr} .hero svg.art{display:none} .shell .ctx,.shell .sep{display:none} }
+
+.wrap{max-width:1320px;margin:0 auto;padding:0 20px 60px}
+.lift{margin-top:-52px;position:relative;z-index:2}
+h2{font-size:16px;margin:30px 0 10px;font-weight:700;display:flex;align-items:center;gap:8px}
+h2::before{content:"";width:4px;height:16px;border-radius:2px;background:linear-gradient(var(--joule-1),var(--joule-3))}
+.card{background:var(--surface-1);border:none;border-radius:12px;padding:16px;box-shadow:var(--shadow)}
+.drop{display:flex;align-items:center;gap:18px;border:2px dashed var(--border);border-radius:12px;padding:20px 24px;background:var(--surface-1);cursor:pointer;transition:border-color .15s,background .15s;box-shadow:var(--shadow)}
+.drop.over,.drop:hover{border-color:var(--accent);background:var(--accent-soft)}
+.drop .ic{flex:none;width:52px;height:52px;border-radius:12px;background:var(--accent-soft);display:grid;place-items:center;color:var(--accent)}
+.drop strong{display:block;font-size:15px;margin-bottom:2px}
 .drop span{color:var(--text-secondary)}
-.btn{font:inherit;border:1px solid var(--border);background:var(--surface-1);color:var(--text-primary);border-radius:8px;padding:6px 12px;cursor:pointer}
-.btn:hover{border-color:var(--accent)}
-.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.drop .go{margin-left:auto}
+.btn{font:inherit;font-weight:700;border:1px solid var(--accent);background:var(--surface-1);color:var(--accent);border-radius:8px;padding:6px 14px;cursor:pointer;white-space:nowrap}
+.btn:hover{background:var(--accent-soft)}
+.btn.primary{background:var(--accent);color:#fff}
+.btn.primary:hover{background:var(--accent-hover)}
 .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:18px 0 6px}
-.tab{font:inherit;border:1px solid var(--border);background:var(--surface-1);color:var(--text-secondary);border-radius:999px;padding:5px 14px;cursor:pointer;max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.tab.active{background:var(--text-primary);color:var(--surface-1);border-color:var(--text-primary)}
-.tab .x{margin-left:8px;opacity:.6}
-.kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px}
-.kpi{background:var(--surface-1);border:1px solid var(--border);border-radius:10px;padding:12px 14px}
+
+/* Icon tab bar (Fiori style) */
+.tabs{display:flex;gap:2px;flex-wrap:wrap;border-bottom:1px solid var(--border)}
+.tab{font:inherit;border:none;background:transparent;color:var(--text-secondary);padding:10px 14px 9px;cursor:pointer;max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-bottom:3px solid transparent;margin-bottom:-1px}
+.tab:hover{color:var(--accent)}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:700}
+.tab .x{margin-left:8px;opacity:.55}
+.tab .x:hover{opacity:1}
+
+.kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(178px,1fr));gap:12px}
+.kpi{background:var(--surface-1);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+.kpi::after{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--accent);opacity:.85}
+.kpi.joule::after{background:linear-gradient(var(--joule-1),var(--joule-3))}
 .kpi .l{color:var(--text-secondary);font-size:12px}
-.kpi .v{font-size:24px;font-weight:650;margin-top:2px;font-variant-numeric:tabular-nums}
+.kpi .v{font-size:24px;font-weight:700;margin-top:2px;font-variant-numeric:tabular-nums}
 .kpi .n{color:var(--text-muted);font-size:12px}
 .legend{display:flex;gap:16px;flex-wrap:wrap;margin:4px 0 10px;color:var(--text-secondary);font-size:12px}
 .legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-2px}
-.legend .grp{color:var(--text-primary);font-weight:600;margin-right:-6px}
 .chart{position:relative;overflow-x:auto}
-.chart svg{display:block}
+.chart svg{display:block;font-family:inherit}
 .chart text{fill:var(--text-secondary);font-size:12px}
 .chart .lbl{fill:var(--text-primary)}
 .chart .val{fill:var(--text-primary);font-variant-numeric:tabular-nums}
 .chart .gridline{stroke:var(--grid)}
 .chart .hit{fill:transparent;cursor:pointer}
 .chart .hit:hover{fill:var(--text-primary);fill-opacity:.04}
-.tip{position:fixed;pointer-events:none;background:var(--surface-1);color:var(--text-primary);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:12px;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:50;display:none;max-width:340px}
+.tip{position:fixed;pointer-events:none;background:var(--surface-1);color:var(--text-primary);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:12px;box-shadow:var(--shadow);z-index:50;display:none;max-width:340px}
 .tip b{display:block;margin-bottom:4px}
 .tip .tr{display:flex;justify-content:space-between;gap:16px;font-variant-numeric:tabular-nums}
 .tip .tr i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px}
 table{width:100%;border-collapse:collapse;font-size:13px}
-th,td{padding:7px 8px;border-bottom:1px solid var(--border);text-align:left;vertical-align:top}
-th{color:var(--text-secondary);font-weight:600;font-size:12px;position:sticky;top:0;background:var(--surface-1)}
+th,td{padding:8px 8px;border-bottom:1px solid var(--border);text-align:left;vertical-align:top}
+th{color:var(--text-secondary);font-weight:700;font-size:12px;position:sticky;top:0;background:var(--surface-1)}
 td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 tr.turn{cursor:pointer}
-tr.turn:hover td{background:var(--surface-2)}
-tr.detail td{background:var(--surface-2);padding:10px 14px}
-.chip{display:inline-block;border:1px solid var(--border);border-radius:6px;padding:1px 6px;margin:1px 3px 1px 0;font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap}
+tr.turn:hover td{background:var(--surface-0)}
+tr.detail td{background:var(--surface-0);padding:10px 14px}
+tfoot td{border-bottom:none}
+.chip{display:inline-block;border:1px solid var(--border);border-radius:6px;padding:1px 6px;margin:1px 3px 1px 0;font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap;background:var(--surface-1)}
 .chip.slow{border-color:var(--critical);color:var(--critical)}
-.badge{display:inline-block;border-radius:6px;padding:1px 7px;font-size:12px;font-weight:600;margin-right:4px}
+.badge{display:inline-block;border-radius:6px;padding:1px 7px;font-size:12px;font-weight:700;margin-right:4px}
 .badge.crit{background:var(--crit-bg);color:var(--critical)}
 .badge.warn{background:var(--warn-bg);color:var(--text-primary)}
 .badge.good{background:var(--good-bg);color:var(--good)}
@@ -94,28 +152,114 @@ tr.detail td{background:var(--surface-2);padding:10px 14px}
 .tl td{border:none;padding:2px 6px}
 .note{color:var(--text-secondary);font-size:12px;margin-top:8px}
 .err{background:var(--crit-bg);color:var(--critical);border-radius:8px;padding:10px 12px;margin-top:10px}
-.scroll{max-height:none;overflow:auto}
-.split{display:grid;grid-template-columns:1fr;gap:14px}
-.toggle{display:flex;gap:4px;border:1px solid var(--border);border-radius:8px;padding:2px;background:var(--surface-1)}
-.toggle button{font:inherit;border:none;background:transparent;color:var(--text-secondary);padding:4px 10px;border-radius:6px;cursor:pointer}
-.toggle button.on{background:var(--surface-2);color:var(--text-primary);font-weight:600}
+.scroll{overflow:auto}
 .hidden{display:none!important}
+
+/* Empty state */
+.empty{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:22px}
+.empty .card{display:flex;gap:14px;align-items:flex-start}
+.empty .card svg{flex:none}
+.empty h3{margin:0 0 4px;font-size:14px}
+.empty p{margin:0;color:var(--text-secondary);font-size:13px}
+@media (max-width:860px){ .empty{grid-template-columns:1fr} }
+
+footer{border-top:1px solid var(--border);margin-top:36px;padding:16px 0 0;color:var(--text-muted);font-size:12px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
 </style>
 </head>
 <body class="viz-root">
-<div class="wrap">
-  <h1>Joule Debug Performance Analyzer</h1>
-  <p class="sub">Load one or more Joule debug JSON exports (Joule panel → ⋯ → Download debug info). Everything is parsed in your browser; nothing is uploaded.</p>
 
-  <label class="drop" id="drop">
-    <strong>Drop debug JSON files here, or click to choose</strong>
-    <span>Multiple files are supported. Each file becomes a tab, plus a comparison tab.</span>
-    <input type="file" id="file" accept=".json,application/json" multiple class="hidden">
-  </label>
-  <div id="errors"></div>
+<header class="shell">
+  <div class="shell-in">
+    <img class="logo" src="https://me.sap.com/resources/sap/me/workspace/widgets/aiAssistant/img/jouleIcon.svg" alt="Joule" onerror="this.style.display='none'">
+    <span class="prod">Joule Performance Analyzer</span>
+    <span class="sep"></span>
+    <span class="ctx">SAP BTP · Joule Studio · Debug log insights</span>
+    <span class="sp"></span>
+    <div class="sig">
+      <div class="av" aria-hidden="true">KM</div>
+      <span>Crafted by <b>Kartik Metkar</b></span>
+      <a href="https://www.linkedin.com/in/kartikmetkar/" target="_blank" rel="noopener noreferrer" title="Kartik Metkar on LinkedIn">LinkedIn
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M6 3H3v10h10v-3M9 2h5v5M14 2 7 9"/></svg>
+      </a>
+    </div>
+    <button class="themebtn" id="themeBtn" title="Toggle light / dark theme" aria-label="Toggle theme">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1Zm0 12.5v-11a5.5 5.5 0 0 1 0 11Z"/></svg>
+    </button>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="glow" style="width:380px;height:380px;background:#ff7ad9;right:-80px;top:-140px"></div>
+  <div class="glow" style="width:300px;height:300px;background:#2fb7ff;left:-120px;bottom:-160px"></div>
+  <div class="hero-in">
+    <div>
+      <span class="eyebrow"><img src="https://me.sap.com/resources/sap/me/workspace/widgets/aiAssistant/img/jouleIcon.svg" alt="" onerror="this.style.display='none'">SAP Joule · Performance insights</span>
+      <h1>See where every second of a Joule conversation goes</h1>
+      <p>Load Joule debug exports and get a step-by-step breakdown: Joule's own processing versus your custom skill code and S/4 API calls, with slow calls, failures and run-to-run comparison.</p>
+      <div class="pills"><span>Idle time excluded</span><span>Joule vs custom code</span><span>API calls per dialog function</span><span>Test vs Dev comparison</span></div>
+    </div>
+    <!-- Original illustration: dashboard card with stacked bars and a timing ring -->
+    <svg class="art" viewBox="0 0 440 300" aria-hidden="true">
+      <defs>
+        <linearGradient id="gCard" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#f3f0ff"/></linearGradient>
+        <linearGradient id="gRing" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3d1fd6"/><stop offset="1" stop-color="#c045d6"/></linearGradient>
+      </defs>
+      <rect x="20" y="24" width="300" height="230" rx="16" fill="url(#gCard)"/>
+      <rect x="40" y="44" width="120" height="10" rx="5" fill="#d9d4f5"/>
+      <rect x="40" y="62" width="70" height="8" rx="4" fill="#ebe8fa"/>
+      <g transform="translate(40,92)">
+        <rect width="90" height="16" rx="3" fill="#2a78d6"/><rect x="92" width="34" height="16" fill="#eb6834"/><rect x="128" width="80" height="16" fill="#1baf7a"/><rect x="210" width="14" height="16" fill="#eda100"/><rect x="226" width="12" height="16" rx="3" fill="#e87ba4"/>
+        <rect y="28" width="70" height="16" rx="3" fill="#2a78d6"/><rect x="72" y="28" width="30" height="16" fill="#eb6834"/><rect x="104" y="28" width="44" height="16" fill="#1baf7a"/><rect x="150" y="28" width="12" height="16" fill="#eda100"/><rect x="164" y="28" width="10" height="16" rx="3" fill="#e87ba4"/>
+        <rect y="56" width="96" height="16" rx="3" fill="#2a78d6"/><rect x="98" y="56" width="40" height="16" fill="#eb6834"/><rect x="140" y="56" width="110" height="16" fill="#1baf7a"/><rect x="252" y="56" width="10" height="16" fill="#eda100"/><rect x="264" y="56" width="8" height="16" rx="3" fill="#e87ba4"/>
+        <rect y="84" width="64" height="16" rx="3" fill="#2a78d6"/><rect x="66" y="84" width="26" height="16" fill="#eb6834"/><rect x="94" y="84" width="36" height="16" fill="#1baf7a"/><rect x="132" y="84" width="12" height="16" fill="#eda100"/><rect x="146" y="84" width="8" height="16" rx="3" fill="#e87ba4"/>
+      </g>
+      <rect x="40" y="210" width="260" height="1" fill="#e2ddf7"/>
+      <rect x="40" y="222" width="54" height="16" rx="8" fill="#ebf8ff"/><rect x="102" y="222" width="54" height="16" rx="8" fill="#f5fae5"/><rect x="164" y="222" width="54" height="16" rx="8" fill="#fff8d6"/>
+      <g transform="translate(330,150)">
+        <circle r="74" fill="#ffffff"/>
+        <circle r="54" fill="none" stroke="#ebe8fa" stroke-width="16"/>
+        <circle r="54" fill="none" stroke="url(#gRing)" stroke-width="16" stroke-linecap="round" stroke-dasharray="200 340" transform="rotate(-90)"/>
+        <circle r="54" fill="none" stroke="#1baf7a" stroke-width="16" stroke-linecap="round" stroke-dasharray="110 340" stroke-dashoffset="-210" transform="rotate(-90)"/>
+        <rect x="-26" y="-12" width="52" height="12" rx="6" fill="#d9d4f5"/>
+        <rect x="-18" y="6" width="36" height="8" rx="4" fill="#ebe8fa"/>
+      </g>
+      <g transform="translate(366,38)">
+        <rect width="64" height="64" rx="14" fill="#ffffff"/>
+        <path d="M18 40 l10-10 8 6 12-16" fill="none" stroke="#0070f2" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+      </g>
+    </svg>
+  </div>
+</section>
+
+<div class="wrap">
+  <div class="lift">
+    <label class="drop" id="drop">
+      <span class="ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg></span>
+      <span><strong>Drop Joule debug JSON files here, or click to browse</strong>
+      <span>Joule panel → ⋯ → Download debug info. Load several files to compare runs. Files are read in your browser only — nothing is uploaded.</span></span>
+      <span class="btn primary go">Select files</span>
+      <input type="file" id="file" accept=".json,application/json" multiple class="hidden">
+    </label>
+    <div id="errors"></div>
+  </div>
+
+  <div class="empty" id="empty">
+    <div class="card">
+      <svg width="44" height="44" viewBox="0 0 44 44" aria-hidden="true"><rect width="44" height="44" rx="12" fill="var(--accent-soft)"/><rect x="10" y="13" width="14" height="5" rx="2" fill="#2a78d6"/><rect x="25" y="13" width="9" height="5" rx="2" fill="#1baf7a"/><rect x="10" y="21" width="10" height="5" rx="2" fill="#2a78d6"/><rect x="21" y="21" width="6" height="5" rx="2" fill="#1baf7a"/><rect x="10" y="29" width="18" height="5" rx="2" fill="#2a78d6"/><rect x="29" y="29" width="5" height="5" rx="2" fill="#1baf7a"/></svg>
+      <div><h3>Step-by-step timing</h3><p>Every conversation turn split into Joule processing, API calls and skill logic.</p></div>
+    </div>
+    <div class="card">
+      <svg width="44" height="44" viewBox="0 0 44 44" aria-hidden="true"><rect width="44" height="44" rx="12" fill="var(--accent-soft)"/><circle cx="22" cy="22" r="11" fill="none" stroke="#d9d4f5" stroke-width="5"/><circle cx="22" cy="22" r="11" fill="none" stroke="#7b37e8" stroke-width="5" stroke-dasharray="40 70" transform="rotate(-90 22 22)"/></svg>
+      <div><h3>Joule vs custom code</h3><p>Know what you can optimise (your code, S/4) and what is platform overhead.</p></div>
+    </div>
+    <div class="card">
+      <svg width="44" height="44" viewBox="0 0 44 44" aria-hidden="true"><rect width="44" height="44" rx="12" fill="var(--accent-soft)"/><rect x="11" y="24" width="6" height="10" rx="2" fill="#2a78d6"/><rect x="19" y="16" width="6" height="18" rx="2" fill="#eb6834"/><rect x="27" y="20" width="6" height="14" rx="2" fill="#1baf7a"/></svg>
+      <div><h3>Compare runs</h3><p>Test vs Dev, before vs after a change — totals and median API time per function.</p></div>
+    </div>
+  </div>
 
   <div id="app" class="hidden">
-    <div class="row" style="justify-content:space-between;margin-top:14px">
+    <div class="row" style="justify-content:space-between;margin-top:22px;align-items:flex-end">
       <div class="tabs" id="tabs"></div>
       <div class="row">
         <button class="btn" id="copyCsv">Copy table as CSV</button>
@@ -126,7 +270,7 @@ tr.detail td{background:var(--surface-2);padding:10px 14px}
   </div>
 
   <details class="card" style="margin-top:28px">
-    <summary style="cursor:pointer;font-weight:600">How the times are calculated</summary>
+    <summary style="cursor:pointer;font-weight:700">How the times are calculated</summary>
     <div class="note" style="font-size:13px">
       <p>A <b>turn</b> starts when the user's message reaches Joule and ends with Joule's last reply to it. Time between Joule's reply and the next user message is <b>idle</b> (user reading/typing) and is excluded from processing time.</p>
       <ul>
@@ -139,6 +283,10 @@ tr.detail td{background:var(--surface-2);padding:10px 14px}
       <p>Turns with no logs (for example Joule answering on its own) are counted entirely as Joule time. A user message without a server timestamp (<code>isSending</code>) never reached Joule and is flagged.</p>
     </div>
   </details>
+  <footer>
+    <span>Joule Performance Analyzer · Crafted by <a href="https://www.linkedin.com/in/kartikmetkar/" target="_blank" rel="noopener noreferrer">Kartik Metkar</a></span>
+    <span>SAP, Joule and SAP BTP are trademarks of SAP SE. Independent tool; not an SAP product.</span>
+  </footer>
 </div>
 <div class="tip" id="tip"></div>
 
@@ -336,7 +484,7 @@ function legendHtml(){
 }
 
 /* ---------- views ---------- */
-function kpi(l, v, n){ return `<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div>${n?`<div class="n">${n}</div>`:''}</div>`; }
+function kpi(l, v, n, cls){ return `<div class="kpi ${cls||''}"><div class="l">${l}</div><div class="v">${v}</div>${n?`<div class="n">${n}</div>`:''}</div>`; }
 
 function renderFile(fa){
   const T = fa.totals;
@@ -347,7 +495,7 @@ function renderFile(fa){
   const html = `
     <div class="kpis" style="margin-top:12px">
       ${kpi('Processing time (excl. idle)', mmss(T.total), `${fa.turns.length} turns · avg ${f1(T.total/(fa.turns.length||1))}s / turn`)}
-      ${kpi('Joule time', mmss(T.joule), `${pct(T.joule,T.total)} of processing`)}
+      ${kpi('Joule time', mmss(T.joule), `${pct(T.joule,T.total)} of processing`, 'joule')}
       ${kpi('Custom code time', mmss(T.custom), `${pct(T.custom,T.total)} · ${T.calls} API calls`)}
       ${kpi('User idle time', mmss(T.idle), `wall clock ${mmss(T.wall)}`)}
       ${kpi('Slowest turn', slowest?f1(slowest.total)+'s':'–', slowest?esc(slowest.user).slice(0,40):'')}
@@ -509,6 +657,7 @@ function renderTabs(){
 }
 function render(){
   app.classList.toggle('hidden', !state.files.length);
+  document.getElementById('empty').classList.toggle('hidden', !!state.files.length);
   if (!state.files.length){ view.innerHTML=''; return; }
   if (!state.active || (state.active!=='cmp' && !state.files.some(f=>f.id===state.active))) state.active = state.files[0].id;
   if (state.active==='cmp' && state.files.length<2) state.active = state.files[0].id;
@@ -572,6 +721,14 @@ document.getElementById('copyCsv').addEventListener('click', async (e)=>{
   setTimeout(()=>btn.textContent='Copy table as CSV',1800);
 });
 
+const root=document.documentElement;
+try{ const t=localStorage.getItem('jpa-theme'); if(t) root.dataset.theme=t; }catch{}
+document.getElementById('themeBtn').addEventListener('click',()=>{
+  const dark = root.dataset.theme ? root.dataset.theme==='dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+  root.dataset.theme = dark ? 'light' : 'dark';
+  try{ localStorage.setItem('jpa-theme', root.dataset.theme); }catch{}
+  if (state.files.length) render();
+});
 let rt; addEventListener('resize',()=>{ clearTimeout(rt); rt=setTimeout(()=>{ if(state.files.length) render(); },150); });
 })();
 </script>
