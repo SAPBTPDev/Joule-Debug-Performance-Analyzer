@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Joule Debug Performance Analyzer</title>
+<style>
+.viz-root{
+  color-scheme:light;
+  --surface-0:#f4f3f0; --surface-1:#fcfcfb; --surface-2:#f0efec;
+  --border:#e2e1dc; --grid:#ebeae6;
+  --text-primary:#0b0b0b; --text-secondary:#52514e; --text-muted:#7a7974;
+  --accent:#2a78d6;
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100; --s5:#e87ba4;
+  --critical:#d03b3b; --good:#0ca30c; --warning:#fab219;
+  --crit-bg:#fbeaea; --warn-bg:#fff6e0; --good-bg:#e9f6e9;
+}
+@media (prefers-color-scheme: dark){
+  :root:where(:not([data-theme="light"])) .viz-root{
+    color-scheme:dark;
+    --surface-0:#121211; --surface-1:#1a1a19; --surface-2:#262624;
+    --border:#33332f; --grid:#2a2a27;
+    --text-primary:#f0efec; --text-secondary:#c3c2b7; --text-muted:#8f8e86;
+    --accent:#3987e5;
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181;
+    --crit-bg:#3a1c1c; --warn-bg:#3a3018; --good-bg:#16301a;
+  }
+}
+:root[data-theme="dark"] .viz-root{
+  color-scheme:dark;
+  --surface-0:#121211; --surface-1:#1a1a19; --surface-2:#262624;
+  --border:#33332f; --grid:#2a2a27;
+  --text-primary:#f0efec; --text-secondary:#c3c2b7; --text-muted:#8f8e86;
+  --accent:#3987e5;
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181;
+  --crit-bg:#3a1c1c; --warn-bg:#3a3018; --good-bg:#16301a;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body.viz-root{background:var(--surface-0);color:var(--text-primary);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:1280px;margin:0 auto;padding:24px 20px 60px}
+h1{font-size:22px;margin:0 0 4px}
+h2{font-size:16px;margin:28px 0 10px}
+.sub{color:var(--text-secondary);margin:0 0 18px}
+.card{background:var(--surface-1);border:1px solid var(--border);border-radius:10px;padding:16px}
+.drop{display:block;border:2px dashed var(--border);border-radius:10px;padding:26px;text-align:center;background:var(--surface-1);cursor:pointer;transition:border-color .15s}
+.drop.over{border-color:var(--accent)}
+.drop strong{display:block;font-size:15px;margin-bottom:4px}
+.drop span{color:var(--text-secondary)}
+.btn{font:inherit;border:1px solid var(--border);background:var(--surface-1);color:var(--text-primary);border-radius:8px;padding:6px 12px;cursor:pointer}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:18px 0 6px}
+.tab{font:inherit;border:1px solid var(--border);background:var(--surface-1);color:var(--text-secondary);border-radius:999px;padding:5px 14px;cursor:pointer;max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tab.active{background:var(--text-primary);color:var(--surface-1);border-color:var(--text-primary)}
+.tab .x{margin-left:8px;opacity:.6}
+.kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px}
+.kpi{background:var(--surface-1);border:1px solid var(--border);border-radius:10px;padding:12px 14px}
+.kpi .l{color:var(--text-secondary);font-size:12px}
+.kpi .v{font-size:24px;font-weight:650;margin-top:2px;font-variant-numeric:tabular-nums}
+.kpi .n{color:var(--text-muted);font-size:12px}
+.legend{display:flex;gap:16px;flex-wrap:wrap;margin:4px 0 10px;color:var(--text-secondary);font-size:12px}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-2px}
+.legend .grp{color:var(--text-primary);font-weight:600;margin-right:-6px}
+.chart{position:relative;overflow-x:auto}
+.chart svg{display:block}
+.chart text{fill:var(--text-secondary);font-size:12px}
+.chart .lbl{fill:var(--text-primary)}
+.chart .val{fill:var(--text-primary);font-variant-numeric:tabular-nums}
+.chart .gridline{stroke:var(--grid)}
+.chart .hit{fill:transparent;cursor:pointer}
+.chart .hit:hover{fill:var(--text-primary);fill-opacity:.04}
+.tip{position:fixed;pointer-events:none;background:var(--surface-1);color:var(--text-primary);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:12px;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:50;display:none;max-width:340px}
+.tip b{display:block;margin-bottom:4px}
+.tip .tr{display:flex;justify-content:space-between;gap:16px;font-variant-numeric:tabular-nums}
+.tip .tr i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:7px 8px;border-bottom:1px solid var(--border);text-align:left;vertical-align:top}
+th{color:var(--text-secondary);font-weight:600;font-size:12px;position:sticky;top:0;background:var(--surface-1)}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+tr.turn{cursor:pointer}
+tr.turn:hover td{background:var(--surface-2)}
+tr.detail td{background:var(--surface-2);padding:10px 14px}
+.chip{display:inline-block;border:1px solid var(--border);border-radius:6px;padding:1px 6px;margin:1px 3px 1px 0;font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.chip.slow{border-color:var(--critical);color:var(--critical)}
+.badge{display:inline-block;border-radius:6px;padding:1px 7px;font-size:12px;font-weight:600;margin-right:4px}
+.badge.crit{background:var(--crit-bg);color:var(--critical)}
+.badge.warn{background:var(--warn-bg);color:var(--text-primary)}
+.badge.good{background:var(--good-bg);color:var(--good)}
+.muted{color:var(--text-muted)}
+.trunc{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tl{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;width:100%}
+.tl td{border:none;padding:2px 6px}
+.note{color:var(--text-secondary);font-size:12px;margin-top:8px}
+.err{background:var(--crit-bg);color:var(--critical);border-radius:8px;padding:10px 12px;margin-top:10px}
+.scroll{max-height:none;overflow:auto}
+.split{display:grid;grid-template-columns:1fr;gap:14px}
+.toggle{display:flex;gap:4px;border:1px solid var(--border);border-radius:8px;padding:2px;background:var(--surface-1)}
+.toggle button{font:inherit;border:none;background:transparent;color:var(--text-secondary);padding:4px 10px;border-radius:6px;cursor:pointer}
+.toggle button.on{background:var(--surface-2);color:var(--text-primary);font-weight:600}
+.hidden{display:none!important}
+</style>
+</head>
+<body class="viz-root">
+<div class="wrap">
+  <h1>Joule Debug Performance Analyzer</h1>
+  <p class="sub">Load one or more Joule debug JSON exports (Joule panel → ⋯ → Download debug info). Everything is parsed in your browser; nothing is uploaded.</p>
+
+  <label class="drop" id="drop">
+    <strong>Drop debug JSON files here, or click to choose</strong>
+    <span>Multiple files are supported. Each file becomes a tab, plus a comparison tab.</span>
+    <input type="file" id="file" accept=".json,application/json" multiple class="hidden">
+  </label>
+  <div id="errors"></div>
+
+  <div id="app" class="hidden">
+    <div class="row" style="justify-content:space-between;margin-top:14px">
+      <div class="tabs" id="tabs"></div>
+      <div class="row">
+        <button class="btn" id="copyCsv">Copy table as CSV</button>
+        <button class="btn" id="clearAll">Clear all</button>
+      </div>
+    </div>
+    <div id="view"></div>
+  </div>
+
+  <details class="card" style="margin-top:28px">
+    <summary style="cursor:pointer;font-weight:600">How the times are calculated</summary>
+    <div class="note" style="font-size:13px">
+      <p>A <b>turn</b> starts when the user's message reaches Joule and ends with Joule's last reply to it. Time between Joule's reply and the next user message is <b>idle</b> (user reading/typing) and is excluded from processing time.</p>
+      <ul>
+        <li><b>Joule – scenario selection</b>: user message → <code>SCENARIO_SELECTED</code> (Joule understands the input and picks the skill).</li>
+        <li><b>Joule – parameter filling</b>: <code>SCENARIO_SELECTED</code> → <code>SCENARIO_EXECUTED_WITH_PARAMETERS</code>.</li>
+        <li><b>Custom – API calls</b>: for each <code>I_API_EXECUTION</code>, the gap since the previous log event. Includes destination / Cloud Connector / S/4 time.</li>
+        <li><b>Custom – skill logic</b>: the rest of the turn between the first and last log event (conditions, set variables, messages, sub-skill hand-offs).</li>
+        <li><b>Joule – rendering</b>: last log event → Joule's reply timestamp.</li>
+      </ul>
+      <p>Turns with no logs (for example Joule answering on its own) are counted entirely as Joule time. A user message without a server timestamp (<code>isSending</code>) never reached Joule and is flagged.</p>
+    </div>
+  </details>
+</div>
+<div class="tip" id="tip"></div>
+
+<script>
+(() => {
+'use strict';
+
+const SEG = [
+  { key:'plan',   label:'Joule – scenario selection', grp:'Joule',  color:'var(--s1)' },
+  { key:'param',  label:'Joule – parameter filling',  grp:'Joule',  color:'var(--s2)' },
+  { key:'api',    label:'Custom – API calls',         grp:'Custom', color:'var(--s3)' },
+  { key:'logic',  label:'Custom – skill logic',       grp:'Custom', color:'var(--s4)' },
+  { key:'render', label:'Joule – rendering',          grp:'Joule',  color:'var(--s5)' },
+];
+const SLOW_API_SEC = 5;
+
+const state = { files: [], active: null };
+
+/* ---------- parsing ---------- */
+function ts(s){
+  if (!s) return null;
+  // trim sub-millisecond digits (Joule emits nanoseconds on user messages)
+  const m = String(s).match(/^(.*?T\d\d:\d\d:\d\d)(\.\d+)?(Z|[+-]\d\d:?\d\d)?$/);
+  if (!m) { const t = Date.parse(s); return isNaN(t) ? null : t/1000; }
+  const frac = m[2] ? m[2].slice(0,4).padEnd(4,'0') : '.000';
+  const t = Date.parse(m[1] + frac + (m[3] || 'Z'));
+  return isNaN(t) ? null : t/1000;
+}
+function msgText(m){
+  const a = m.attachment || {};
+  const c = a.content;
+  if (c == null) return '';
+  if (typeof c === 'string') return c;
+  const pick = v => (v && typeof v === 'object') ? (v.value ?? v.text ?? '') : (v ?? '');
+  return String(pick(c.title) || c.text || pick(c.subtitle) || c.value || a.type || '').replace(/\*\*/g,'');
+}
+function median(a){ if(!a.length) return 0; const s=[...a].sort((x,y)=>x-y); const h=s.length>>1; return s.length%2?s[h]:(s[h-1]+s[h])/2; }
+function sum(a){ return a.reduce((x,y)=>x+y,0); }
+
+function analyse(name, json){
+  const msgs = Array.isArray(json?.messages) ? json.messages : null;
+  if (!msgs) throw new Error('No "messages" array found — is this a Joule debug export?');
+  const turns = []; const warnings = [];
+  let cur = null, lastBot = null;
+  for (const m of msgs){
+    const isBot = !!m.participant?.isBot;
+    const t = ts(m.receivedAt);
+    if (!isBot){
+      if (t == null){
+        warnings.push({ level:'crit', text:`User message "${msgText(m)}" never reached Joule (no server timestamp${m.isSending?', isSending=true':''}). The UI was left waiting.` });
+        cur = null; continue;
+      }
+      cur = { user:m, userText:msgText(m), userType:m.attachment?.type, t0:t, idle: lastBot!=null ? Math.max(0,t-lastBot) : null, bots:[] };
+      turns.push(cur);
+    } else {
+      if (cur) cur.bots.push(m);
+      if (t != null) lastBot = t;
+    }
+  }
+  const fnStats = {};
+  const out = [];
+  turns.forEach((tn, i) => {
+    if (!tn.bots.length){ warnings.push({level:'warn', text:`Turn ${i+1} ("${tn.userText}") got no reply in this export.`}); return; }
+    const end = Math.max(...tn.bots.map(b=>ts(b.receivedAt)).filter(x=>x!=null));
+    const logs = tn.bots.flatMap(b => b.logs || []).map(l => ({...l, _t: ts(l.timestamp)})).filter(l=>l._t!=null).sort((a,b)=>a._t-b._t);
+    const total = Math.max(0, end - tn.t0);
+    let plan=0, param=0, api=0, render=0;
+    const sel = logs.find(l=>l.code==='SCENARIO_SELECTED');
+    const exe = logs.find(l=>l.code==='SCENARIO_EXECUTED_WITH_PARAMETERS');
+    if (sel) plan = Math.max(0, sel._t - tn.t0);
+    if (sel && exe) param = Math.max(0, exe._t - sel._t);
+    const calls = []; const fns = new Set(); let fails = [];
+    let prev = null;
+    for (const l of logs){
+      const fn = l.context?.dialog_function_name;
+      if (fn) fns.add(fn);
+      if (l.code === 'I_API_EXECUTION' && prev != null){
+        const d = Math.max(0, l._t - prev);
+        api += d;
+        calls.push({ fn: fn || '?', sec: d, status: l.data?.http_status });
+        (fnStats[fn||'?'] ||= []).push(d);
+      }
+      if (l.level === 'warning' || l.level === 'error' || /FAILED/.test(l.code||'')) fails.push(l);
+      prev = l._t;
+    }
+    if (logs.length) render = Math.max(0, end - logs[logs.length-1]._t);
+    let logic, noLogs = !logs.length;
+    if (noLogs){ plan = total; logic = 0; }
+    else logic = Math.max(0, total - plan - param - api - render);
+    const lastBot = tn.bots[tn.bots.length-1];
+    out.push({
+      n: out.length+1, user: tn.userText, userType: tn.userType, reply: msgText(lastBot),
+      idle: tn.idle, total, plan, param, api, logic, render,
+      joule: plan+param+render, custom: api+logic,
+      calls, fns:[...fns], fails, noLogs,
+      scenario: sel?.context?.scenario_name || exe?.context?.scenario_name || '',
+      reasoning: sel?.data?.reasoning || '', task: sel?.data?.task || '',
+      logs, t0: tn.t0, start: msgs.find(x=>x===tn.user)?.receivedAt
+    });
+    if (fails.length) warnings.push({ level:'warn', text:`Turn ${out.length} ("${tn.userText}"): ${fails.length} warning/failed log event(s) — ${[...new Set(fails.map(f=>f.code))].join(', ')}.` });
+  });
+  const firstT = msgs.map(m=>ts(m.receivedAt)).find(x=>x!=null);
+  const lastT = [...msgs].reverse().map(m=>ts(m.receivedAt)).find(x=>x!=null);
+  const allFns = new Set(out.flatMap(t=>t.fns));
+  const tot = k => sum(out.map(t=>t[k]));
+  return {
+    name, turns: out, warnings, fnStats,
+    totals: { total:tot('total'), plan:tot('plan'), param:tot('param'), api:tot('api'), logic:tot('logic'), render:tot('render'),
+              joule:tot('joule'), custom:tot('custom'), idle: sum(out.map(t=>t.idle||0)), wall: (lastT-firstT)||0,
+              calls: sum(out.map(t=>t.calls.length)) },
+    pr: allFns.has('prPost'), po: allFns.has('poCreate') || allFns.has('prPost'),
+    startedAt: firstT ? new Date(firstT*1000) : null,
+    sig: msgs.map(m=>m.id).join('|')
+  };
+}
+
+/* ---------- formatting ---------- */
+const f1 = x => (x==null ? '–' : (Math.round(x*10)/10).toFixed(1));
+const f0 = x => (x==null ? '–' : String(Math.round(x)));
+const pct = (a,b) => b>0 ? Math.round(100*a/b)+'%' : '–';
+const mmss = s => { s=Math.round(s); const m=Math.floor(s/60); return m? `${m}m ${String(s%60).padStart(2,'0')}s` : `${s}s`; };
+const esc = s => String(s??'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+/* ---------- tooltip ---------- */
+const tip = document.getElementById('tip');
+function showTip(e, html){ tip.innerHTML = html; tip.style.display='block'; moveTip(e); }
+function moveTip(e){
+  const pad=14, w=tip.offsetWidth, h=tip.offsetHeight;
+  let x=e.clientX+pad, y=e.clientY+pad;
+  if (x+w>innerWidth-8) x=e.clientX-w-pad;
+  if (y+h>innerHeight-8) y=e.clientY-h-pad;
+  tip.style.left=x+'px'; tip.style.top=y+'px';
+}
+function hideTip(){ tip.style.display='none'; }
+function turnTipHtml(t, title){
+  const rows = SEG.map(s=>`<div class="tr"><span><i style="background:${s.color}"></i>${s.label}</span><span>${f1(t[s.key])}s</span></div>`).join('');
+  const calls = t.calls.length ? `<div style="margin-top:6px" class="muted">API: ${t.calls.map(c=>`${esc(c.fn)} ${f1(c.sec)}s`).join(' · ')}</div>` : '';
+  return `<b>${esc(title)}</b>${rows}<div class="tr" style="margin-top:4px;font-weight:600"><span>Total</span><span>${f1(t.total)}s</span></div>${calls}`;
+}
+
+/* ---------- charts ---------- */
+const SVGNS='http://www.w3.org/2000/svg';
+function el(tag, attrs={}, parent){ const e=document.createElementNS(SVGNS,tag); for(const k in attrs) e.setAttribute(k,attrs[k]); if(parent) parent.appendChild(e); return e; }
+
+function stackedBars(container, rows, opts={}){
+  // rows: [{label, sub, data:{plan,param,...}, total, tipTitle}]
+  const labelW = opts.labelW || 230, rowH = 30, barH = 18, gap = 2, padR = 56, padT = 22;
+  const width = Math.max(640, container.clientWidth || 900);
+  const plotW = width - labelW - padR;
+  const max = Math.max(1, ...rows.map(r=>r.total));
+  const step = niceStep(max);
+  const axisMax = Math.ceil(max/step)*step;
+  const height = padT + rows.length*rowH + 8;
+  const svg = el('svg',{width, height, role:'img', 'aria-label': opts.aria || 'Time per turn'});
+  const x = v => labelW + (v/axisMax)*plotW;
+  for (let v=0; v<=axisMax+1e-9; v+=step){
+    el('line',{x1:x(v),x2:x(v),y1:padT-6,y2:height-8,class:'gridline'},svg);
+    const tx = el('text',{x:x(v),y:12,'text-anchor':'middle'},svg); tx.textContent = f0(v)+'s';
+  }
+  rows.forEach((r,i)=>{
+    const y = padT + i*rowH + (rowH-barH)/2;
+    const lt = el('text',{x:labelW-10,y:y+barH/2+4,'text-anchor':'end',class:'lbl'},svg);
+    lt.textContent = r.label.length>34 ? r.label.slice(0,33)+'…' : r.label;
+    let cx = x(0);
+    const segs = SEG.filter(s=>r.data[s.key]>0.0005);
+    segs.forEach((s,j)=>{
+      const w = (r.data[s.key]/axisMax)*plotW;
+      const ww = Math.max(0, w - (j<segs.length-1 ? gap : 0));
+      if (ww>0){
+        const last = j===segs.length-1;
+        if (last && ww>4){
+          // rounded data-end (right side only)
+          const rr=4, h=barH;
+          el('path',{d:`M${cx},${y} h${ww-rr} a${rr},${rr} 0 0 1 ${rr},${rr} v${h-2*rr} a${rr},${rr} 0 0 1 -${rr},${rr} h-${ww-rr} z`, fill:s.color},svg);
+        } else el('rect',{x:cx,y,width:ww,height:barH,fill:s.color},svg);
+      }
+      cx += w;
+    });
+    const vt = el('text',{x:x(r.total)+6,y:y+barH/2+4,class:'val'},svg); vt.textContent = f1(r.total)+'s';
+    const hit = el('rect',{x:0,y:padT+i*rowH,width,height:rowH,class:'hit'},svg);
+    hit.addEventListener('mouseenter',e=>showTip(e, turnTipHtml({...r.data,total:r.total,calls:r.calls||[]}, r.tipTitle||r.label)));
+    hit.addEventListener('mousemove',moveTip);
+    hit.addEventListener('mouseleave',hideTip);
+    if (opts.onClick) hit.addEventListener('click',()=>opts.onClick(i));
+  });
+  container.innerHTML=''; container.appendChild(svg);
+}
+function niceStep(max){
+  const raw = max/6; const p = Math.pow(10, Math.floor(Math.log10(raw)));
+  for (const m of [1,2,2.5,5,10]) if (raw <= m*p) return m*p;
+  return 10*p;
+}
+function legendHtml(){
+  return `<div class="legend">${SEG.map(s=>`<span><i style="background:${s.color}"></i>${s.label}</span>`).join('')}</div>`;
+}
+
+/* ---------- views ---------- */
+function kpi(l, v, n){ return `<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div>${n?`<div class="n">${n}</div>`:''}</div>`; }
+
+function renderFile(fa){
+  const T = fa.totals;
+  const slowest = [...fa.turns].sort((a,b)=>b.total-a.total)[0];
+  const allCalls = fa.turns.flatMap(t=>t.calls.map(c=>({...c, turn:t.n})));
+  const slowestCall = [...allCalls].sort((a,b)=>b.sec-a.sec)[0];
+  const warn = fa.warnings.map(w=>`<div><span class="badge ${w.level==='crit'?'crit':'warn'}">${w.level==='crit'?'Critical':'Warning'}</span>${esc(w.text)}</div>`).join('');
+  const html = `
+    <div class="kpis" style="margin-top:12px">
+      ${kpi('Processing time (excl. idle)', mmss(T.total), `${fa.turns.length} turns · avg ${f1(T.total/(fa.turns.length||1))}s / turn`)}
+      ${kpi('Joule time', mmss(T.joule), `${pct(T.joule,T.total)} of processing`)}
+      ${kpi('Custom code time', mmss(T.custom), `${pct(T.custom,T.total)} · ${T.calls} API calls`)}
+      ${kpi('User idle time', mmss(T.idle), `wall clock ${mmss(T.wall)}`)}
+      ${kpi('Slowest turn', slowest?f1(slowest.total)+'s':'–', slowest?esc(slowest.user).slice(0,40):'')}
+      ${kpi('Slowest API call', slowestCall?f1(slowestCall.sec)+'s':'–', slowestCall?`${esc(slowestCall.fn)} · turn ${slowestCall.turn}`:'')}
+      ${kpi('Outcome', fa.pr ? '<span class="badge good">PR step reached</span>' : '<span class="badge warn">No PR create</span>', fa.startedAt ? 'Started '+fa.startedAt.toLocaleString() : '')}
+    </div>
+    ${warn ? `<div class="card" style="margin-top:12px">${warn}</div>`:''}
+
+    <h2>Time per turn</h2>
+    <div class="card">
+      ${legendHtml()}
+      <div class="chart" id="turnChart"></div>
+      <div class="note">Hover a bar for the breakdown; click it to jump to the turn's log timeline below.</div>
+    </div>
+
+    <h2>Joule vs custom code</h2>
+    <div class="card"><div class="chart" id="splitChart"></div></div>
+
+    <h2>Turn details</h2>
+    <div class="card scroll">
+      <table id="turnTable">
+        <thead><tr>
+          <th>#</th><th>User input</th><th>Joule reply</th><th>Skill</th>
+          <th class="num">Idle before</th><th class="num">Total</th>
+          <th class="num">Joule</th><th class="num">Custom</th>
+          <th class="num">Scen. sel.</th><th class="num">Params</th><th class="num">API</th><th class="num">Logic</th><th class="num">Render</th>
+          <th>API calls (s)</th>
+        </tr></thead>
+        <tbody>${fa.turns.map(t=>turnRow(t)).join('')}</tbody>
+        <tfoot><tr style="font-weight:650">
+          <td></td><td>Total</td><td></td><td></td>
+          <td class="num">${f1(T.idle)}</td><td class="num">${f1(T.total)}</td>
+          <td class="num">${f1(T.joule)}</td><td class="num">${f1(T.custom)}</td>
+          <td class="num">${f1(T.plan)}</td><td class="num">${f1(T.param)}</td><td class="num">${f1(T.api)}</td><td class="num">${f1(T.logic)}</td><td class="num">${f1(T.render)}</td><td></td>
+        </tr></tfoot>
+      </table>
+      <div class="note">Click a row to see every log event with its offset from the user's message. API calls ≥ ${SLOW_API_SEC}s are outlined.</div>
+    </div>
+
+    <h2>API calls by dialog function</h2>
+    <div class="card scroll">${fnTable(fa.fnStats)}</div>
+  `;
+  view.innerHTML = html;
+  stackedBars(document.getElementById('turnChart'), fa.turns.map(t=>({
+    label:`${t.n}. ${t.user}`, data:t, total:t.total, calls:t.calls, tipTitle:`Turn ${t.n}: ${t.user}`
+  })), { aria:'Processing time per turn, stacked by component', onClick: i => openTurn(fa.turns[i].n, true) });
+  splitBars(document.getElementById('splitChart'), [{label:'This run', joule:T.joule, custom:T.custom}]);
+  document.querySelectorAll('#turnTable tr.turn').forEach(tr => tr.addEventListener('click', () => openTurn(+tr.dataset.n)));
+}
+
+function turnRow(t){
+  const calls = t.calls.map(c=>`<span class="chip ${c.sec>=SLOW_API_SEC?'slow':''}" title="${esc(c.fn)}">${esc(c.fn)} ${f1(c.sec)}</span>`).join('') || '<span class="muted">—</span>';
+  const flags = (t.fails.length?`<span class="badge warn" title="${esc(t.fails.map(f=>f.code).join(', '))}">${t.fails.length} warn</span>`:'') + (t.noLogs?'<span class="badge warn" title="No skill logs: Joule answered without a custom skill">no logs</span>':'');
+  return `<tr class="turn" data-n="${t.n}">
+    <td>${t.n}</td>
+    <td class="trunc" title="${esc(t.user)}">${esc(t.user)}</td>
+    <td class="trunc" title="${esc(t.reply)}">${flags}${esc(t.reply)}</td>
+    <td>${esc(t.scenario)}</td>
+    <td class="num muted">${t.idle==null?'–':f1(t.idle)}</td>
+    <td class="num"><b>${f1(t.total)}</b></td>
+    <td class="num">${f1(t.joule)}</td><td class="num">${f1(t.custom)}</td>
+    <td class="num">${f1(t.plan)}</td><td class="num">${f1(t.param)}</td><td class="num">${f1(t.api)}</td><td class="num">${f1(t.logic)}</td><td class="num">${f1(t.render)}</td>
+    <td>${calls}</td></tr>`;
+}
+
+function openTurn(n, scroll){
+  const fa = state.files.find(f=>f.id===state.active); if(!fa) return;
+  const t = fa.turns.find(x=>x.n===n); if(!t) return;
+  const tr = document.querySelector(`#turnTable tr.turn[data-n="${n}"]`);
+  const next = tr.nextElementSibling;
+  if (next && next.classList.contains('detail')){ if(!scroll){ next.remove(); return; } }
+  else {
+    const rows = t.logs.map(l=>{
+      const off = l._t - t.t0;
+      const fn = l.context?.dialog_function_name || '';
+      const extra = l.code==='I_API_EXECUTION' ? `HTTP ${esc(l.data?.http_status??'')}` :
+        l.code==='SCENARIO_EXECUTED_WITH_PARAMETERS' ? esc(JSON.stringify(l.data||{})).slice(0,220) : '';
+      return `<tr><td class="num">+${f1(off)}s</td><td>${esc(l.code||l.type)}</td><td>${esc(fn)}</td><td class="muted">${extra}</td></tr>`;
+    }).join('');
+    const why = t.reasoning ? `<div class="note"><b>Joule's reasoning:</b> ${esc(t.reasoning)}</div>` : '';
+    const d = document.createElement('tr'); d.className='detail';
+    d.innerHTML = `<td colspan="14"><div class="muted" style="margin-bottom:6px">User message at ${esc(t.start||'')} → reply after ${f1(t.total)}s</div>
+      ${rows?`<table class="tl"><tbody>${rows}</tbody></table>`:'<span class="muted">No log events in this turn.</span>'}${why}</td>`;
+    tr.after(d);
+  }
+  if (scroll) tr.scrollIntoView({behavior:'smooth', block:'center'});
+}
+
+function fnTable(stats){
+  const rows = Object.entries(stats).map(([fn,v])=>({fn, n:v.length, med:median(v), mean:sum(v)/v.length, max:Math.max(...v), tot:sum(v)}))
+    .sort((a,b)=>b.tot-a.tot);
+  if (!rows.length) return '<span class="muted">No API calls in this run.</span>';
+  return `<table><thead><tr><th>Dialog function</th><th class="num">Calls</th><th class="num">Median</th><th class="num">Mean</th><th class="num">Max</th><th class="num">Total</th></tr></thead>
+    <tbody>${rows.map(r=>`<tr><td>${esc(r.fn)}</td><td class="num">${r.n}</td><td class="num">${f1(r.med)}s</td><td class="num">${f1(r.mean)}s</td><td class="num ${r.max>=SLOW_API_SEC?'':''}">${f1(r.max)}s</td><td class="num"><b>${f1(r.tot)}s</b></td></tr>`).join('')}</tbody></table>`;
+}
+
+function splitBars(container, rows){
+  // two-segment horizontal bars: Joule (s1) vs Custom (s3)
+  const labelW=230,rowH=34,barH=20,padR=260,padT=22,gap=2;
+  const width=Math.max(640, container.clientWidth||900), plotW=width-labelW-padR;
+  const max=Math.max(1,...rows.map(r=>r.joule+r.custom)); const step=niceStep(max); const axisMax=Math.ceil(max/step)*step;
+  const height=padT+rows.length*rowH+30;
+  const svg=el('svg',{width,height,role:'img','aria-label':'Joule time versus custom code time'});
+  const x=v=>labelW+(v/axisMax)*plotW;
+  for(let v=0;v<=axisMax+1e-9;v+=step){ el('line',{x1:x(v),x2:x(v),y1:padT-6,y2:padT+rows.length*rowH,class:'gridline'},svg); const t=el('text',{x:x(v),y:12,'text-anchor':'middle'},svg); t.textContent=f0(v)+'s'; }
+  rows.forEach((r,i)=>{
+    const y=padT+i*rowH+(rowH-barH)/2, tot=r.joule+r.custom;
+    const lt=el('text',{x:labelW-10,y:y+barH/2+4,'text-anchor':'end',class:'lbl'},svg); lt.textContent=r.label.length>34?r.label.slice(0,33)+'…':r.label;
+    const wj=(r.joule/axisMax)*plotW, wc=(r.custom/axisMax)*plotW;
+    el('rect',{x:x(0),y,width:Math.max(0,wj-gap),height:barH,fill:'var(--s1)'},svg);
+    const rr=4, cx=x(0)+wj;
+    if (wc>rr) el('path',{d:`M${cx},${y} h${wc-rr} a${rr},${rr} 0 0 1 ${rr},${rr} v${barH-2*rr} a${rr},${rr} 0 0 1 -${rr},${rr} h-${wc-rr} z`,fill:'var(--s3)'},svg);
+    const vt=el('text',{x:x(tot)+6,y:y+barH/2+4,class:'val'},svg); vt.textContent=`${f0(tot)}s  (Joule ${pct(r.joule,tot)} · Custom ${pct(r.custom,tot)})`;
+    const hit=el('rect',{x:0,y:padT+i*rowH,width,height:rowH,class:'hit'},svg);
+    const h=`<b>${esc(r.label)}</b><div class="tr"><span><i style="background:var(--s1)"></i>Joule</span><span>${f1(r.joule)}s</span></div><div class="tr"><span><i style="background:var(--s3)"></i>Custom code</span><span>${f1(r.custom)}s</span></div><div class="tr" style="font-weight:600"><span>Total</span><span>${f1(tot)}s</span></div>`;
+    hit.addEventListener('mouseenter',e=>showTip(e,h)); hit.addEventListener('mousemove',moveTip); hit.addEventListener('mouseleave',hideTip);
+  });
+  const ly=padT+rows.length*rowH+18;
+  el('rect',{x:labelW,y:ly-9,width:10,height:10,rx:2,fill:'var(--s1)'},svg); const a=el('text',{x:labelW+15,y:ly},svg); a.textContent='Joule (scenario selection + parameters + rendering)';
+  el('rect',{x:labelW+330,y:ly-9,width:10,height:10,rx:2,fill:'var(--s3)'},svg); const b=el('text',{x:labelW+345,y:ly},svg); b.textContent='Custom code (API calls + skill logic)';
+  container.innerHTML=''; container.appendChild(svg);
+}
+
+function renderCompare(){
+  const fs = state.files;
+  const rows = fs.map(f=>{
+    const T=f.totals; return `<tr>
+      <td>${esc(f.label)}</td><td class="num">${f.turns.length}</td>
+      <td class="num"><b>${f1(T.total)}</b></td><td class="num">${f1(T.total/(f.turns.length||1))}</td>
+      <td class="num">${f1(T.joule)} <span class="muted">(${pct(T.joule,T.total)})</span></td>
+      <td class="num">${f1(T.custom)} <span class="muted">(${pct(T.custom,T.total)})</span></td>
+      <td class="num">${f1(T.plan)}</td><td class="num">${f1(T.param)}</td><td class="num">${f1(T.api)}</td><td class="num">${f1(T.logic)}</td><td class="num">${f1(T.render)}</td>
+      <td class="num">${T.calls}</td><td class="num muted">${f1(T.idle)}</td>
+      <td>${f.pr?'<span class="badge good">PR</span>':'<span class="badge warn">no PR</span>'}</td></tr>`;
+  }).join('');
+  // per-function median across files
+  const fnNames=[...new Set(fs.flatMap(f=>Object.keys(f.fnStats)))].sort();
+  const fnRows=fnNames.map(fn=>`<tr><td>${esc(fn)}</td>${fs.map(f=>{const v=f.fnStats[fn]; return `<td class="num">${v?`${f1(median(v))}s <span class="muted">×${v.length}</span>`:'<span class="muted">–</span>'}</td>`;}).join('')}</tr>`).join('');
+  view.innerHTML = `
+    <h2>Runs compared</h2>
+    <div class="card">${legendHtml()}<div class="chart" id="cmpChart"></div></div>
+    <h2>Joule vs custom code</h2>
+    <div class="card"><div class="chart" id="cmpSplit"></div></div>
+    <h2>Totals (seconds)</h2>
+    <div class="card scroll"><table><thead><tr><th>Run</th><th class="num">Turns</th><th class="num">Total</th><th class="num">Avg / turn</th><th class="num">Joule</th><th class="num">Custom</th><th class="num">Scen. sel.</th><th class="num">Params</th><th class="num">API</th><th class="num">Logic</th><th class="num">Render</th><th class="num">API calls</th><th class="num">Idle</th><th>Outcome</th></tr></thead><tbody>${rows}</tbody></table>
+    <div class="note">Rename a run (e.g. "Test" / "Dev") by double-clicking its tab.</div></div>
+    <h2>Median API call time by dialog function</h2>
+    <div class="card scroll"><table><thead><tr><th>Dialog function</th>${fs.map(f=>`<th class="num">${esc(f.label)}</th>`).join('')}</tr></thead><tbody>${fnRows}</tbody></table></div>`;
+  stackedBars(document.getElementById('cmpChart'), fs.map(f=>({label:f.label, data:f.totals, total:f.totals.total, tipTitle:f.label})), {aria:'Total processing time per run'});
+  splitBars(document.getElementById('cmpSplit'), fs.map(f=>({label:f.label, joule:f.totals.joule, custom:f.totals.custom})));
+}
+
+/* ---------- tabs / state ---------- */
+const tabsEl=document.getElementById('tabs'), view=document.getElementById('view'), app=document.getElementById('app'), errors=document.getElementById('errors');
+function renderTabs(){
+  const items = state.files.map(f=>`<button class="tab ${state.active===f.id?'active':''}" data-id="${f.id}" title="${esc(f.name)}">${esc(f.label)}<span class="x" data-del="${f.id}" aria-label="Remove">×</span></button>`);
+  if (state.files.length>1) items.push(`<button class="tab ${state.active==='cmp'?'active':''}" data-id="cmp">Compare all (${state.files.length})</button>`);
+  tabsEl.innerHTML = items.join('');
+}
+function render(){
+  app.classList.toggle('hidden', !state.files.length);
+  if (!state.files.length){ view.innerHTML=''; return; }
+  if (!state.active || (state.active!=='cmp' && !state.files.some(f=>f.id===state.active))) state.active = state.files[0].id;
+  if (state.active==='cmp' && state.files.length<2) state.active = state.files[0].id;
+  renderTabs();
+  if (state.active==='cmp') renderCompare(); else renderFile(state.files.find(f=>f.id===state.active));
+}
+tabsEl.addEventListener('click', e=>{
+  const del = e.target.closest('[data-del]');
+  if (del){ state.files = state.files.filter(f=>f.id!==del.dataset.del); render(); e.stopPropagation(); return; }
+  const b = e.target.closest('.tab'); if (!b) return; state.active=b.dataset.id; render();
+});
+tabsEl.addEventListener('dblclick', e=>{
+  const b=e.target.closest('.tab'); if(!b||b.dataset.id==='cmp') return;
+  const f=state.files.find(x=>x.id===b.dataset.id); if(!f) return;
+  b.innerHTML=''; const inp=document.createElement('input'); inp.value=f.label; inp.style.cssText='font:inherit;width:160px;border:none;background:transparent;color:inherit';
+  b.appendChild(inp); inp.focus(); inp.select();
+  const done=()=>{ f.label=inp.value.trim()||f.label; render(); };
+  inp.addEventListener('blur',done); inp.addEventListener('keydown',ev=>{ if(ev.key==='Enter') inp.blur(); if(ev.key==='Escape'){ inp.value=f.label; inp.blur(); } });
+});
+
+let seq=0;
+async function addFiles(list){
+  errors.innerHTML='';
+  const errs=[];
+  for (const file of list){
+    try{
+      if (file.size===0) throw new Error('File is empty (0 bytes). Re-export it from Joule and wait for the download to finish.');
+      const text = await file.text();
+      let json; try{ json = JSON.parse(text); } catch(e){ throw new Error('Not valid JSON: '+e.message); }
+      const fa = analyse(file.name, json);
+      if (state.files.some(f=>f.sig===fa.sig)){ errs.push(`${file.name}: same conversation as an already loaded file — skipped.`); continue; }
+      fa.id = 'f'+(++seq);
+      fa.label = file.name.replace(/\.json$/i,'').replace(/^[0-9a-f]{8}-/i,'');
+      state.files.push(fa); state.active = fa.id;
+    } catch(e){ errs.push(`${file.name}: ${e.message}`); }
+  }
+  if (errs.length) errors.innerHTML = errs.map(m=>`<div class="err">${esc(m)}</div>`).join('');
+  render();
+}
+const drop=document.getElementById('drop'), fileInp=document.getElementById('file');
+fileInp.addEventListener('change',()=>{ addFiles([...fileInp.files]); fileInp.value=''; });
+['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault(); drop.classList.add('over');}));
+['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault(); drop.classList.remove('over');}));
+drop.addEventListener('drop',e=>addFiles([...e.dataTransfer.files]));
+document.getElementById('clearAll').addEventListener('click',()=>{ state.files=[]; state.active=null; errors.innerHTML=''; render(); });
+
+document.getElementById('copyCsv').addEventListener('click', async (e)=>{
+  const q = v => `"${String(v??'').replace(/"/g,'""')}"`;
+  let lines=[];
+  if (state.active==='cmp'){
+    lines.push(['Run','Turns','Total s','Joule s','Custom s','Scenario selection s','Params s','API s','Logic s','Render s','API calls','Idle s'].map(q).join(','));
+    state.files.forEach(f=>{const T=f.totals; lines.push([f.label,f.turns.length,f1(T.total),f1(T.joule),f1(T.custom),f1(T.plan),f1(T.param),f1(T.api),f1(T.logic),f1(T.render),T.calls,f1(T.idle)].map(q).join(','));});
+  } else {
+    const f=state.files.find(x=>x.id===state.active);
+    lines.push(['#','User input','Joule reply','Skill','Idle before s','Total s','Joule s','Custom s','Scenario selection s','Params s','API s','Logic s','Render s','API calls'].map(q).join(','));
+    f.turns.forEach(t=>lines.push([t.n,t.user,t.reply,t.scenario,t.idle==null?'':f1(t.idle),f1(t.total),f1(t.joule),f1(t.custom),f1(t.plan),f1(t.param),f1(t.api),f1(t.logic),f1(t.render),t.calls.map(c=>`${c.fn} ${f1(c.sec)}`).join('; ')].map(q).join(',')));
+  }
+  const btn=e.currentTarget;
+  try{ await navigator.clipboard.writeText(lines.join('\n')); btn.textContent='Copied ✓'; }
+  catch{ btn.textContent='Copy blocked by browser'; }
+  setTimeout(()=>btn.textContent='Copy table as CSV',1800);
+});
+
+let rt; addEventListener('resize',()=>{ clearTimeout(rt); rt=setTimeout(()=>{ if(state.files.length) render(); },150); });
+})();
+</script>
+</body>
+</html>
